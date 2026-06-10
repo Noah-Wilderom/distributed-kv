@@ -5,7 +5,8 @@ defmodule Kvx.Application do
   def start(_type, _args) do
     children = [
       {Registry, keys: :unique, name: Kvx.ShardRegistry},
-      {Kvx.Store.Supervisor, Kvx.Store.Router.num_shards()}
+      Kvx.Cluster.Membership,
+      {Kvx.Store.Supervisor, Kvx.Store.Router.num_shards()},
     ]
 
     Supervisor.start_link(children, strategy: :one_for_one, name: Kvx.Supervisor)

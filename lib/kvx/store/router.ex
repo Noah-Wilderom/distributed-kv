@@ -5,5 +5,8 @@ defmodule Kvx.Store.Router do
 
   def shard_for(key), do: :erlang.phash2(key, @num_shards)
 
-  def node_for(_shard), do: node()
+  def node_for(shard) do
+    nodes = Kvx.Cluster.Membership.nodes()
+    Enum.at(nodes, rem(shard, length(nodes)))
+  end
 end
