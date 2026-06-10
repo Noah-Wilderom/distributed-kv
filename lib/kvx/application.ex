@@ -6,6 +6,7 @@ defmodule Kvx.Application do
     children = [
       {Registry, keys: :unique, name: Kvx.ShardRegistry},
       Kvx.Cluster.Membership,
+      Kvx.Cluster.Monitor,
       {Kvx.Store.Supervisor, Kvx.Store.Router.num_shards()},
     ]
 
