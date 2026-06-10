@@ -5,7 +5,7 @@ defmodule Kvx.Cluster.Membership do
     GenServer.start_link(__MODULE__, :ok, name: Keyword.get(opts, :name, __MODULE__))
   end
 
-  def nodes(server \\__MODULE__) do
+  def nodes(server \\ __MODULE__) do
     GenServer.call(server, :nodes)
   end
 

@@ -14,9 +14,10 @@ defmodule Kvx.Store.RouterTest do
   end
 
   test "distributes keys accross shards" do
-    used = for i <- 1..1000, into: MapSet.new() do
-      Router.shard_for("key_#{i}")
-    end
+    used =
+      for i <- 1..1000, into: MapSet.new() do
+        Router.shard_for("key_#{i}")
+      end
 
     assert MapSet.size(used) == Router.num_shards()
   end
