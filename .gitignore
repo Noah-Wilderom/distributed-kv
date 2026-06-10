@@ -1,0 +1,7 @@
+.elixir_ls/
+_build/
+
+.vscode/
+.zed/
+.idea/
+.DS_Store
