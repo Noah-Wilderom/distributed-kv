@@ -4,6 +4,5 @@ defmodule Kvx.Store.RouterTest do
   alias Kvx.Store.Router
 
   test "" do
-
   end
 end
