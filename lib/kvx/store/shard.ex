@@ -22,6 +22,10 @@ defmodule Kvx.Store.Shard do
     GenServer.call(via(shard_id), {:delete, key})
   end
 
+  def apply_replica(shard_id, op, version) do
+    GenServer.cast(via(shard_id), {:replica, op, version})
+  end
+
   @impl true
   def init(shard_id) do
     table =
@@ -33,13 +37,25 @@ defmodule Kvx.Store.Shard do
   @impl true
   def handle_call({:put, key, value}, _from, state) do
     :ets.insert(state.table, {key, value})
+    Kvx.Replication.Replicator.replicate(state.id, {:put, key, value}, state.version + 1)
     {:reply, :ok, %{state | version: state.version + 1}}
   end
 
   @impl true
   def handle_call({:delete, key}, _from, state) do
     :ets.delete(state.table, key)
+    Kvx.Replication.Replicator.replicate(state.id, {:delete, key}, state.version + 1)
     {:reply, :ok, %{state | version: state.version + 1}}
+  end
+
+  @impl true
+  def handle_cast({:replica, op, version}, state) do
+    case op do
+      {:put, key, value} -> :ets.insert(state.table, {key, value})
+      {:delete, key} -> :ets.delete(state.table, key)
+    end
+
+    {:noreply, %{state | version: version}}
   end
 
   defp table_name(shard_id), do: :"kvx_shard_#{shard_id}"

@@ -25,4 +25,25 @@ defmodule Kvx.Store.RouterTest do
   test "node_for returns the local node" do
     assert Router.node_for(0) == node()
   end
+
+  test "node_for maps shards across an explicit node" do
+    nodes = [:a@x, :b@x, :c@x]
+    assert Router.node_for(0, nodes) == :a@x
+    assert Router.node_for(1, nodes) == :b@x
+    assert Router.node_for(2, nodes) == :c@x
+    # wraps: rem(3, 3) == 0
+    assert Router.node_for(3, nodes) == :a@x
+  end
+
+  test "backup_for is the next node after the primary wrapping" do
+    nodes = [:a@x, :b@x, :c@x]
+    assert Router.backup_for(0, nodes) == :b@x
+    assert Router.backup_for(1, nodes) == :c@x
+    # wraps: rem(2 + 1, 3) == 0
+    assert Router.backup_for(2, nodes) == :a@x
+  end
+
+  test "backup_for is nil on a single-node cluster" do
+    assert Router.backup_for(0, [:only@xl]) == nil
+  end
 end
