@@ -1,0 +1,25 @@
+version: "3"
+
+tasks:
+  test:
+    desc: Run tests
+    cmds:
+      - mix test --cover --trace
+  format:check:
+    desc: Check formatting
+    cmds:
+      - mix format --check-formatted
+  format:fix:
+    desc: Fix formatting
+    cmds:
+      - mix format
+
+  docker:build:
+    desc: Build docker image
+    cmds:
+      - docker build -t distributed-kv . --no-cache
+
+  docker:run:
+    desc: Run docker image
+    cmds:
+      - docker run -p 4000:4000 distributed-kv

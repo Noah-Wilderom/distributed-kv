@@ -23,4 +23,18 @@ defmodule Kvx.Store.ShardReplicaTest do
 
     assert {:error, :not_found} = Shard.get(5, "replica-delete")
   end
+
+  test "the shard logs its writes and serves them via since" do
+    [{pid, _}] = Registry.lookup(Kvx.ShardRegistry, 6)
+    %{version: baseline} = :sys.get_state(pid)
+
+    Shard.put(6, "log-a", 1)
+    Shard.put(6, "log-b", 2)
+    Shard.delete(6, "log-a")
+
+    assert {:ok, entries} = Shard.since(6, baseline)
+
+    ops = Enum.map(entries, fn {_version, op} -> op end)
+    assert ops == [{:put, "log-a", 1}, {:put, "log-b", 2}, {:delete, "log-a"}]
+  end
 end

@@ -1,6 +1,10 @@
 defmodule Kvx.Store.Shard do
   use GenServer
 
+  @log_capacity 1000
+
+  alias Kvx.Replication.{Replicator, Log}
+
   def start_link(shard_id) do
     GenServer.start_link(__MODULE__, shard_id, name: via(shard_id))
   end
@@ -26,26 +30,54 @@ defmodule Kvx.Store.Shard do
     GenServer.cast(via(shard_id), {:replica, op, version})
   end
 
+  def since(shard_id, version) do
+    GenServer.call(via(shard_id), {:since, version})
+  end
+
+  def version(shard_id) do
+    GenServer.call(via(shard_id), :version)
+  end
+
   @impl true
   def init(shard_id) do
     table =
       :ets.new(table_name(shard_id), [:named_table, :set, :protected, read_concurrency: true])
 
-    {:ok, %{id: shard_id, table: table, version: 0}}
+    {:ok, %{id: shard_id, table: table, version: 0, log: Log.new(@log_capacity)}}
   end
 
   @impl true
   def handle_call({:put, key, value}, _from, state) do
+    new_version = state.version + 1
+    op = {:put, key, value}
+
     :ets.insert(state.table, {key, value})
-    Kvx.Replication.Replicator.replicate(state.id, {:put, key, value}, state.version + 1)
-    {:reply, :ok, %{state | version: state.version + 1}}
+    Replicator.replicate(state.id, op, new_version)
+    log = Log.append(state.log, new_version, op)
+
+    {:reply, :ok, %{state | version: new_version, log: log}}
   end
 
   @impl true
   def handle_call({:delete, key}, _from, state) do
+    new_version = state.version + 1
+    op = {:delete, key}
+
     :ets.delete(state.table, key)
-    Kvx.Replication.Replicator.replicate(state.id, {:delete, key}, state.version + 1)
-    {:reply, :ok, %{state | version: state.version + 1}}
+    Replicator.replicate(state.id, op, new_version)
+    log = Log.append(state.log, new_version, op)
+
+    {:reply, :ok, %{state | version: new_version, log: log}}
+  end
+
+  @impl true
+  def handle_call({:since, version}, _from, state) do
+    {:reply, Log.since(state.log, version), state}
+  end
+
+  @impl true
+  def handle_call(:version, _from, state) do
+    {:reply, state.version, state}
   end
 
   @impl true

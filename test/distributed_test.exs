@@ -8,10 +8,16 @@ defmodule Kvx.DistributedTest do
     {:ok, peer, peer_node} =
       :peer.start_link(%{
         name: :kvx_peer,
+        connection: :standard_io,
         args: Enum.flat_map(:code.get_path(), &[~c"-pa", &1])
       })
 
+    true = Node.connect(peer_node)
     {:ok, _} = :erpc.call(peer_node, Application, :ensure_all_started, [:kvx])
+
+    on_exit(fn ->
+      wait_until(fn -> Membership.nodes() == [node()] end)
+    end)
 
     # peer is linked; it dies with
     %{peer: peer, peer_node: peer_node}
@@ -69,6 +75,42 @@ defmodule Kvx.DistributedTest do
     assert wait_until(fn -> Membership.nodes() == [node()] end)
 
     assert {:ok, "survives"} = Kvx.get(key)
+  end
+
+  test "a reconnecting backup catches up on writes it missed", %{peer_node: peer_node} do
+    assert wait_until(fn -> length(Membership.nodes()) == 2 end)
+
+    shard =
+      Enum.find(0..(Router.num_shards() - 1), fn s ->
+        Router.node_for(s) == node() and Router.backup_for(s) == peer_node
+      end)
+
+    refute is_nil(shard)
+
+    :ok = Shard.put(shard, "before", "v1")
+
+    assert wait_until(fn ->
+             :erpc.call(peer_node, Shard, :get, [shard, "before"]) ==
+               {:ok, "v1"}
+           end)
+
+    Node.disconnect(peer_node)
+    assert wait_until(fn -> Membership.nodes() == [node()] end)
+
+    :ok = Shard.put(shard, "during", "v2")
+
+    Node.connect(peer_node)
+    assert wait_until(fn -> length(Membership.nodes()) == 2 end)
+
+    assert wait_until(fn ->
+             length(:erpc.call(peer_node, Membership, :nodes, [])) ==
+               2
+           end)
+
+    assert wait_until(fn ->
+             :erpc.call(peer_node, Shard, :get, [shard, "during"]) ==
+               {:ok, "v2"}
+           end)
   end
 
   defp wait_until(fun) do
