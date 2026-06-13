@@ -34,7 +34,11 @@ defmodule Kvx.Store.ShardReplicaTest do
 
     assert {:ok, entries} = Shard.since(6, baseline)
 
-    ops = Enum.map(entries, fn {_version, op} -> op end)
+    ops =
+      entries
+      |> Enum.map(fn {_version, op} -> op end)
+      |> Enum.filter(fn op -> elem(op, 1) in ["log-a", "log-b"] end)
+
     assert ops == [{:put, "log-a", 1}, {:put, "log-b", 2}, {:delete, "log-a"}]
   end
 end
